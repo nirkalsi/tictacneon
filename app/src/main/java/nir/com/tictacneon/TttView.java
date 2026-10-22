@@ -11,8 +11,9 @@ import java.util.Random;
 /** Tic Tac Neon - neon tic-tac-toe vs AI (3 levels) or a friend. */
 public class TttView extends View {
     public interface Listener {
-        void onGameComplete(int gamesDone);
+        void onGameComplete(int gamesDone, int outcome, int difficulty); // 1=X win, 2=O win, 3=draw
         void onHintRequested();
+        void onLevelUp(int level, String rank);
         void saveState();
     }
 
@@ -33,6 +34,9 @@ public class TttView extends View {
     private int[] winLine = null;         // 3 winning cells
     private int scoreX = 0, scoreO = 0, draws = 0;
     private long gamesDone = 0;
+    private long xp = 0;
+    private int level = 1;
+    private long levelFlashUntil = 0;
     private long aiMoveAt = 0;
     private long winAnimStart = 0;
     private int hintCell = -1;
@@ -42,7 +46,7 @@ public class TttView extends View {
 
     public void setListener(Listener l) { listener = l; }
 
-    public String serialize() { return scoreX + ";" + scoreO + ";" + draws + ";" + gamesDone + ";" + difficulty + ";" + (vsAI ? 1 : 0); }
+    public String serialize() { return scoreX + ";" + scoreO + ";" + draws + ";" + gamesDone + ";" + difficulty + ";" + (vsAI ? 1 : 0) + ";" + xp + ";" + level; }
     public void restore(String s) {
         try {
             String[] a = s.split(";");
@@ -50,10 +54,33 @@ public class TttView extends View {
             draws = Integer.parseInt(a[2]); gamesDone = Long.parseLong(a[3]);
             difficulty = Math.min(2, Math.max(0, Integer.parseInt(a[4])));
             vsAI = a[5].equals("1");
+            if (a.length > 6) xp = Long.parseLong(a[6]);
+            if (a.length > 7) level = Math.max(1, Integer.parseInt(a[7]));
         } catch (Exception ignored) {}
     }
 
     private void persist() { if (listener != null) listener.saveState(); }
+
+    private void grantXp(long gain) {
+        xp += gain;
+        while (xp >= xpNeeded()) {
+            xp -= xpNeeded();
+            level++;
+            levelFlashUntil = System.currentTimeMillis() + 2200;
+            if (listener != null) listener.onLevelUp(level, rankName(level));
+        }
+    }
+
+    public int getLevel() { return level; }
+    public long getGamesDone() { return gamesDone; }
+    private long xpNeeded() { return level * 400L; }
+    public static String rankName(int level) {
+        if (level >= 12) return "NEON LEGEND";
+        if (level >= 8) return "NEON MASTER";
+        if (level >= 5) return "NEON PRO";
+        if (level >= 3) return "NEON PLAYER";
+        return "ROOKIE";
+    }
 
     public void showHint() {
         if (gameOver || (vsAI && turn != X)) return;
@@ -124,12 +151,18 @@ public class TttView extends View {
             gameOver = true; winner = turn; winLine = w; winAnimStart = System.currentTimeMillis();
             if (turn == X) scoreX++; else scoreO++;
             gamesDone++;
+            long gain;
+            if (!vsAI) gain = 20;
+            else if (turn == X) gain = difficulty == 2 ? 100 : (difficulty == 1 ? 50 : 30);
+            else gain = 5;
+            grantXp(gain);
             persist();
-            if (listener != null) listener.onGameComplete((int) gamesDone);
+            if (listener != null) listener.onGameComplete((int) gamesDone, turn == X ? 1 : 2, difficulty);
         } else if (full(board)) {
             gameOver = true; winner = EMPTY; draws++; gamesDone++;
+            grantXp(vsAI ? 15 : 10);
             persist();
-            if (listener != null) listener.onGameComplete((int) gamesDone);
+            if (listener != null) listener.onGameComplete((int) gamesDone, 3, difficulty);
         } else {
             turn = (turn == X) ? O : X;
             if (vsAI && turn == O) {
@@ -174,6 +207,24 @@ public class TttView extends View {
         cv.drawText("Draws " + draws, w * 0.5f, getHeight() * 0.13f, p);
         p.setColor(0xFFFF6E9C);
         cv.drawText(right, w * 0.8f, getHeight() * 0.13f, p);
+
+        // rank + xp bar
+        p.setTextSize(w * 0.034f);
+        p.setColor(0xFF8FA3C8);
+        cv.drawText("LV " + level + "  " + rankName(level), w * 0.5f, getHeight() * 0.163f, p);
+        float barL = w * 0.24f, barR = w * 0.76f, barY = getHeight() * 0.168f, barH = w * 0.016f;
+        rf.set(barL, barY, barR, barY + barH);
+        p.setColor(0xFF1E3A6E); cv.drawRoundRect(rf, 8, 8, p);
+        float frac = Math.min(1f, xp / (float) xpNeeded());
+        rf.set(barL, barY, barL + (barR - barL) * frac, barY + barH);
+        p.setColor(0xFF4DD0E1); cv.drawRoundRect(rf, 8, 8, p);
+        if (now < levelFlashUntil) {
+            p.setTextSize(w * 0.055f);
+            p.setColor(0xFF4DD0E1);
+            p.setFakeBoldText(true);
+            cv.drawText("RANK UP!", w / 2, getHeight() * 0.05f + getHeight() * 0.16f, p);
+            p.setFakeBoldText(false);
+        }
 
         // board
         float boardSize = w * 0.86f;

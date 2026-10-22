@@ -16,6 +16,8 @@ public class AdsManager {
     private final Activity act;
     private InterstitialAd inter;
     private RewardedAd rewarded;
+    private boolean adsRemoved = false;
+    public void setAdsRemoved(boolean removed) { adsRemoved = removed; }
     private long lastInterAt = 0;
     private boolean initialized = false;
 
@@ -43,7 +45,7 @@ public class AdsManager {
     }
 
     public void attachBanner(LinearLayout box) {
-        if (!initialized) return;
+        if (!initialized || adsRemoved) return;
         AdView av = new AdView(act);
         av.setAdSize(AdSize.BANNER);
         av.setAdUnitId(BuildConfig.BANNER_ID);
@@ -69,7 +71,7 @@ public class AdsManager {
 
     /** Show interstitial if pacing allows. Call with the completed-order count. */
     public void maybeShowInterstitial(int ordersDone) {
-        if (inter == null || ordersDone < 3 || ordersDone % 3 != 0) return;
+        if (adsRemoved || inter == null || ordersDone < 3 || ordersDone % 3 != 0) return;
         long now = System.currentTimeMillis();
         if (now - lastInterAt < 90000) return;
         lastInterAt = now;
