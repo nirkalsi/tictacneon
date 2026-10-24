@@ -289,6 +289,7 @@ public class TttView extends View {
         }
 
         // status / result
+        p.clearShadowLayer();
         float ctrlY = by + boardSize + getHeight() * 0.035f;
         p.setTextSize(w * 0.05f);
         p.setFakeBoldText(true);
