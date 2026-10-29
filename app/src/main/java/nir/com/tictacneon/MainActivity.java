@@ -68,7 +68,7 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         if (sp.getString("first_run", null) == null)
             sp.edit().putString("first_run", today()).apply();
 
-        handler.postDelayed(this::maybeDailyBonus, 900);
+        if (sp.getInt("games_done_flag", 0) > 0) handler.postDelayed(this::maybeDailyBonus, 900);
         refreshHintsLabel();
     }
 
@@ -293,6 +293,7 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         if (sp.getInt("games_done_flag", 0) == 0) {
             sp.edit().putInt("games_done_flag", 1).apply();
             if (!sp.getBoolean("ads_removed", false)) ads.attachBanner(bannerBox);
+            handler.postDelayed(this::maybeDailyBonus, 1200);
         }
     }
 

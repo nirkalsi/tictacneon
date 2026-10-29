@@ -154,11 +154,14 @@ public class TttView extends View {
         if (gameOver || board[cell] != EMPTY) return;
         board[cell] = turn;
         cellT[cell] = System.currentTimeMillis();
+        GameSounds.play(GameSounds.CLICK);
+        performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
         hintCell = -1;
         int[] w = checkWin(board);
         if (w != null) {
             gameOver = true; winner = turn; winLine = w; winAnimStart = System.currentTimeMillis();
             startSparks();
+            GameSounds.play(GameSounds.WIN);
             if (turn == X) scoreX++; else scoreO++;
             gamesDone++;
             long gain;
