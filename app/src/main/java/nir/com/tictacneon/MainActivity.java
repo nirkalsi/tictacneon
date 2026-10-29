@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -58,7 +59,9 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         boolean removed = sp.getBoolean("ads_removed", false);
         ads.setAdsRemoved(removed);
         if (removed) applyAdsRemoved();
-        ads.initWithConsent(() -> { if (!removed) ads.attachBanner(bannerBox); });
+        ads.initWithConsent(() -> {
+            if (!removed && sp.getInt("games_done_flag", 0) > 0) ads.attachBanner(bannerBox);
+        });
 
         billing = new BillingManager(this, this);
 
@@ -69,29 +72,39 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         refreshHintsLabel();
     }
 
+    private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
+
+    private GradientDrawable pill(int color, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        g.setStroke(dp(1), 0x33FFFFFF);
+        return g;
+    }
+
     private View buildButtonRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER);
-        row.setPadding(4, 6, 4, 0);
-        addRowButton(row, "MISSIONS", v -> showMissions());
-        hintsBtn = addRowButton(row, "HINTS", v -> useOrGetHint());
-        addRowButton(row, "MORE GAMES", v ->
-            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.DEV_PAGE_URL))));
-        removeAdsBtn = addRowButton(row, "NO ADS", v -> buyRemoveAds());
+        row.setPadding(dp(6), dp(6), dp(6), dp(2));
+        addRowButton(row, "\uD83C\uDFAF MISSIONS", v -> showMissions(), 0xFF1565C0);
+        hintsBtn = addRowButton(row, "\u2728 HINTS", v -> useOrGetHint(), 0xFF6A1B9A);
+        removeAdsBtn = addRowButton(row, "NO ADS", v -> buyRemoveAds(), 0xFF546E7A);
         return row;
     }
 
-    private Button addRowButton(LinearLayout row, String label, View.OnClickListener l) {
+    private Button addRowButton(LinearLayout row, String label, View.OnClickListener l, int color) {
         Button btn = new Button(this);
         btn.setText(label);
-        btn.setTextSize(11f);
+        btn.setTextSize(12f);
+        btn.setSingleLine(true);
+        btn.setPadding(0, 0, 0, 0);
         btn.setTypeface(Typeface.DEFAULT_BOLD);
         btn.setTextColor(Color.WHITE);
-        btn.setBackgroundColor(0xFF1E3A6E);
+        btn.setBackground(pill(color, 22));
         btn.setMinHeight(0); btn.setMinimumHeight(0);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, (int) (48 * getResources().getDisplayMetrics().density), 1f);
-        lp.setMargins(4, 0, 4, 0);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        lp.setMargins(dp(4), 0, dp(4), 0);
         row.addView(btn, lp);
         btn.setOnClickListener(l);
         return btn;
@@ -119,10 +132,68 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         if (today().equals(last)) return;
         int streak = yesterday().equals(last) ? sp.getInt("daily_streak", 0) + 1 : 1;
         int tokens = Math.min(1 + streak, 5);
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(dp(12), dp(16), dp(12), dp(4));
+
+        TextView gift = new TextView(this);
+        gift.setText("\u2728");
+        gift.setTextSize(44f);
+        gift.setGravity(Gravity.CENTER);
+        box.addView(gift);
+
+        TextView title = new TextView(this);
+        title.setText("Daily Bonus - Day " + streak);
+        title.setTextSize(22f);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(0xFFFFFFFF);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dp(6), 0, dp(10));
+        box.addView(title);
+
+        LinearLayout track = new LinearLayout(this);
+        track.setOrientation(LinearLayout.HORIZONTAL);
+        track.setGravity(Gravity.CENTER);
+        for (int d = 1; d <= 7; d++) {
+            LinearLayout cell = new LinearLayout(this);
+            cell.setOrientation(LinearLayout.VERTICAL);
+            cell.setGravity(Gravity.CENTER);
+            boolean isToday = d == Math.min(streak, 7);
+            boolean claimed = d < streak;
+            cell.setBackground(pill(isToday ? 0xFFFFD54F : (claimed ? 0xFFC8E6C9 : 0xFFECEFF1), 10));
+            cell.setPadding(dp(2), dp(6), dp(2), dp(6));
+            TextView dl = new TextView(this);
+            dl.setText("Day " + d);
+            dl.setTextSize(9f);
+            dl.setTextColor(0xFF37474F);
+            dl.setGravity(Gravity.CENTER);
+            cell.addView(dl);
+            TextView dv = new TextView(this);
+            dv.setText(claimed ? "\u2714" : "+" + Math.min(1 + d, 5));
+            dv.setTextSize(11f);
+            dv.setTypeface(Typeface.DEFAULT_BOLD);
+            dv.setTextColor(isToday ? 0xFF6D4C00 : 0xFF37474F);
+            dv.setGravity(Gravity.CENTER);
+            cell.addView(dv);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(0, -2, 1f);
+            clp.setMargins(dp(2), 0, dp(2), 0);
+            track.addView(cell, clp);
+        }
+        box.addView(track, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView sub = new TextView(this);
+        sub.setText("Today's gift: +" + tokens + " hint tokens. Keep the streak alive!");
+        sub.setTextSize(13f);
+        sub.setTextColor(0xFFB0BEC5);
+        sub.setGravity(Gravity.CENTER);
+        sub.setPadding(0, dp(10), 0, dp(4));
+        box.addView(sub);
+
         final int t = tokens, st = streak;
         new AlertDialog.Builder(this)
-            .setTitle("Daily bonus - day " + st)
-            .setMessage("Your day " + st + " gift: +" + t + " hint tokens. Come back tomorrow to grow your streak!")
+            .setView(box)
             .setPositiveButton("Claim +" + t, (d, w) -> {
                 sp.edit().putString("daily_last", today()).putInt("daily_streak", st).apply();
                 missions.onDailyClaimed(st);
@@ -219,6 +290,10 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         missions.onGame(outcome, difficulty);
         if (outcome == 1 && difficulty == 2) maybePromptReview();
         ads.maybeShowInterstitial(gamesDone);
+        if (sp.getInt("games_done_flag", 0) == 0) {
+            sp.edit().putInt("games_done_flag", 1).apply();
+            if (!sp.getBoolean("ads_removed", false)) ads.attachBanner(bannerBox);
+        }
     }
 
     private void maybePromptReview() {

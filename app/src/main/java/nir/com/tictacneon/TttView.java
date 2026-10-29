@@ -41,6 +41,12 @@ public class TttView extends View {
     private long winAnimStart = 0;
     private int hintCell = -1;
     private long hintUntil = 0;
+    private final long[] cellT = new long[9];       // placement time per cell (0 = empty)
+    private long aiThinkingSince = 0;
+    // win sparks
+    private final float[] sx = new float[22], sy = new float[22], svx = new float[22], svy = new float[22];
+    private boolean sparksOn = false;
+    private long sparksAt = 0;
 
     public TttView(Context c) { super(c); }
 
@@ -91,8 +97,10 @@ public class TttView extends View {
 
     private void reset() {
         board = new int[9];
+        for (int i = 0; i < 9; i++) cellT[i] = 0;
         gameOver = false; winner = EMPTY; winLine = null; hintCell = -1;
         turn = X;
+        sparksOn = false;
         invalidate();
     }
 
@@ -145,10 +153,12 @@ public class TttView extends View {
     private void place(int cell) {
         if (gameOver || board[cell] != EMPTY) return;
         board[cell] = turn;
+        cellT[cell] = System.currentTimeMillis();
         hintCell = -1;
         int[] w = checkWin(board);
         if (w != null) {
             gameOver = true; winner = turn; winLine = w; winAnimStart = System.currentTimeMillis();
+            startSparks();
             if (turn == X) scoreX++; else scoreO++;
             gamesDone++;
             long gain;
@@ -167,6 +177,7 @@ public class TttView extends View {
             turn = (turn == X) ? O : X;
             if (vsAI && turn == O) {
                 aiMoveAt = System.currentTimeMillis() + 450;
+                aiThinkingSince = System.currentTimeMillis();
                 postDelayed(this::doAiMove, 450);
             }
         }
@@ -177,6 +188,33 @@ public class TttView extends View {
         if (gameOver || !vsAI || turn != O) return;
         int m = aiMove();
         if (m >= 0) place(m);
+    }
+
+    private void startSparks() {
+        sparksOn = true;
+        sparksAt = System.currentTimeMillis();
+        for (int i = 0; i < 22; i++) {
+            sx[i] = 0.5f; sy[i] = 0.42f;
+            svx[i] = (rng.nextFloat() - 0.5f) * 0.0025f;
+            svy[i] = -(0.0007f + rng.nextFloat() * 0.0024f);
+        }
+    }
+
+    private void drawSparks(Canvas cv, float w, float h, long now) {
+        if (!sparksOn) return;
+        float t = (now - sparksAt) / 1000f;
+        if (t > 1.8f) { sparksOn = false; return; }
+        int[] cols = {0xFF4DD0E1, 0xFFFF6E9C, 0xFFFFD700, 0xFF7CFC00};
+        for (int i = 0; i < 22; i++) {
+            float x = (sx[i] + svx[i] * t * 60) * w;
+            float y = (sy[i] + svy[i] * t * 60 + 0.0011f * t * t * 3600) * h;
+            if (y > h) continue;
+            p.setColor(cols[i % 4]);
+            p.setShadowLayer(8, 0, 0, cols[i % 4]);
+            cv.drawCircle(x, y, w * 0.010f, p);
+        }
+        p.clearShadowLayer();
+        postInvalidateDelayed(32);
     }
 
     @Override protected void onDraw(Canvas cv) {
@@ -232,15 +270,19 @@ public class TttView extends View {
         float by = getHeight() * 0.18f;
         float cell = boardSize / 3;
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(5);
+        p.setStrokeWidth(6);
+        p.setStrokeCap(Paint.Cap.ROUND);
+        float gridPulse = 0.75f + 0.25f * (float) Math.sin(now / 900.0);
         p.setColor(0xFF3D5A99);
-        p.setShadowLayer(10, 0, 0, 0xFF3D5A99);
+        p.setShadowLayer(10 + 8 * gridPulse, 0, 0, 0xFF3D5A99);
         for (int i = 1; i < 3; i++) {
-            cv.drawLine(bx + i * cell, by + 6, bx + i * cell, by + boardSize - 6, p);
-            cv.drawLine(bx + 6, by + i * cell, bx + boardSize - 6, by + i * cell, p);
+            cv.drawLine(bx + i * cell, by + 10, bx + i * cell, by + boardSize - 10, p);
+            cv.drawLine(bx + 10, by + i * cell, bx + boardSize - 10, by + i * cell, p);
         }
         p.clearShadowLayer();
         p.setStyle(Paint.Style.FILL);
+        p.setStrokeCap(Paint.Cap.BUTT);
+        postInvalidateDelayed(120);
 
         // marks
         float pad = cell * 0.22f;
@@ -250,15 +292,19 @@ public class TttView extends View {
         for (int i = 0; i < 9; i++) {
             if (board[i] == EMPTY) continue;
             float cx = bx + (i % 3) * cell, cy = by + (i / 3) * cell;
+            float t = Math.min(1f, (now - cellT[i]) / 260f);
+            if (t < 1f) postInvalidateDelayed(28);
             if (board[i] == X) {
                 p.setColor(0xFF4DD0E1);
                 p.setShadowLayer(14, 0, 0, 0xFF4DD0E1);
-                cv.drawLine(cx + pad, cy + pad, cx + cell - pad, cy + cell - pad, p);
-                cv.drawLine(cx + cell - pad, cy + pad, cx + pad, cy + cell - pad, p);
+                float t1 = Math.min(1f, t * 2f), t2 = Math.max(0f, Math.min(1f, t * 2f - 1f));
+                cv.drawLine(cx + pad, cy + pad, cx + pad + (cell - 2 * pad) * t1, cy + pad + (cell - 2 * pad) * t1, p);
+                if (t2 > 0)
+                    cv.drawLine(cx + cell - pad, cy + pad, cx + cell - pad - (cell - 2 * pad) * t2, cy + pad + (cell - 2 * pad) * t2, p);
             } else {
                 p.setColor(0xFFFF6E9C);
                 p.setShadowLayer(14, 0, 0, 0xFFFF6E9C);
-                cv.drawCircle(cx + cell / 2, cy + cell / 2, cell / 2 - pad, p);
+                cv.drawArc(new RectF(cx + pad, cy + pad, cx + cell - pad, cy + cell - pad), -90, 360 * t, false, p);
             }
             p.clearShadowLayer();
         }
@@ -295,50 +341,82 @@ public class TttView extends View {
         p.setTextSize(w * 0.05f);
         p.setFakeBoldText(true);
         if (gameOver) {
-            if (winner == X) { p.setColor(0xFF4DD0E1); cv.drawText(vsAI ? "YOU WIN!" : "X WINS!", w / 2, ctrlY, p); }
-            else if (winner == O) { p.setColor(0xFFFF6E9C); cv.drawText(vsAI ? "AI WINS!" : "O WINS!", w / 2, ctrlY, p); }
-            else { p.setColor(0xFFB0BEC5); cv.drawText("DRAW!", w / 2, ctrlY, p); }
+            float wt = Math.min(1f, (now - winAnimStart) / 420f);
+            float scale = wt < 0.5f ? 0.6f + 1.1f * wt : 1f;
+            p.setTextSize(w * 0.055f * scale);
+            int col = winner == X ? 0xFF4DD0E1 : (winner == O ? 0xFFFF6E9C : 0xFFB0BEC5);
+            String msg = winner == X ? (vsAI ? "YOU WIN!" : "X WINS!") : (winner == O ? (vsAI ? "AI WINS!" : "O WINS!") : "DRAW!");
+            p.setColor(col);
+            p.setShadowLayer(18, 0, 0, col);
+            cv.drawText(msg, w / 2, ctrlY, p);
+            p.clearShadowLayer();
+            if (wt < 1f) postInvalidateDelayed(30);
+            p.setTextSize(w * 0.034f);
+            p.setColor(0xFF8FA3C8);
+            cv.drawText("Tap the board for a rematch", w / 2, ctrlY + getHeight() * 0.024f, p);
         } else {
             p.setColor(0xFF8FA3C8);
-            String t = vsAI ? (turn == X ? "Your turn (X)" : "AI thinking...") : (turn == X ? "X to move" : "O to move");
-            cv.drawText(t, w / 2, ctrlY, p);
+            if (vsAI && turn == O) {
+                int dots = (int) ((now - aiThinkingSince) / 350 % 4);
+                StringBuilder sb = new StringBuilder("AI thinking");
+                for (int d = 0; d < dots; d++) sb.append('.');
+                cv.drawText(sb.toString(), w / 2, ctrlY, p);
+                postInvalidateDelayed(120);
+            } else {
+                String t = vsAI ? "Your turn (X)" : (turn == X ? "X to move" : "O to move");
+                cv.drawText(t, w / 2, ctrlY, p);
+            }
         }
         p.setFakeBoldText(false);
+        drawSparks(cv, w, getHeight(), now);
 
-        // buttons row
-        float btnY = ctrlY + getHeight() * 0.03f;
-        float btnH = getHeight() * 0.06f;
-        p.setTextSize(w * 0.04f);
-        // mode button
-        rf.set(w * 0.05f, btnY, w * 0.36f, btnY + btnH);
-        drawBtn(cv, rf, vsAI ? "VS AI" : "2 PLAYERS");
-        // difficulty button (only vs AI)
+        // buttons: row of three pills + full-width NEW GAME
+        float btnY = ctrlY + getHeight() * 0.038f;
+        float btnH = getHeight() * 0.052f;
+        drawNeonPill(cv, w * 0.05f, btnY, w * 0.30f, btnH, vsAI ? "VS AI" : "2 PLAYERS", 0xFF26C6DA, 0xFF00838F, true, false);
         if (vsAI) {
-            rf.set(w * 0.40f, btnY, w * 0.62f, btnY + btnH);
-            drawBtn(cv, rf, DIFF[difficulty]);
+            drawNeonPill(cv, w * 0.37f, btnY, w * 0.26f, btnH, DIFF[difficulty], 0xFFAB47BC, 0xFF6A1B9A, true, false);
+            drawNeonPill(cv, w * 0.65f, btnY, w * 0.30f, btnH, "\u2728 HINT", 0xFF42A5F5, 0xFF1565C0, !gameOver && turn == X, false);
+        } else {
+            drawNeonPill(cv, w * 0.37f, btnY, w * 0.58f, btnH, "PASS & PLAY", 0xFFAB47BC, 0xFF6A1B9A, false, false);
         }
-        // hint button (vs AI only)
-        if (vsAI) {
-            rf.set(w * 0.66f, btnY, w * 0.82f, btnY + btnH);
-            drawBtn(cv, rf, "HINT");
-        }
-        // new game button
-        rf.set(vsAI ? w * 0.86f : w * 0.40f, btnY, w * 0.97f, btnY + btnH);
-        if (!vsAI) rf.set(w * 0.40f, btnY, w * 0.62f, btnY + btnH);
-        drawBtn(cv, rf, "NEW");
+        float newY = btnY + btnH + getHeight() * 0.012f;
+        float pulse = gameOver ? (float) (0.5 + 0.5 * Math.sin(now / 450.0)) : 0f;
+        if (pulse > 0) postInvalidateDelayed(60);
+        drawNeonPill(cv, w * 0.16f, newY, w * 0.68f, btnH, "NEW GAME  \u21BB", 0xFF66BB6A, 0xFF2E7D32, true, pulse > 0.6f);
     }
 
-    private void drawBtn(Canvas cv, RectF r, String label) {
+    private void drawNeonPill(Canvas cv, float x, float y, float w, float h, String label,
+                              int cTop, int cBottom, boolean enabled, boolean glow) {
+        rf.set(x, y, x + w, y + h);
+        if (glow && enabled) {
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(h * 0.07f); p.setColor(0x554DD0E1);
+            RectF g = new RectF(rf.left - 5, rf.top - 5, rf.right + 5, rf.bottom + 5);
+            cv.drawRoundRect(g, h * 0.5f + 5, h * 0.5f + 5, p);
+            p.setStyle(Paint.Style.FILL);
+        }
+        if (enabled) {
+            p.setShader(new LinearGradient(0, rf.top, 0, rf.bottom, cTop, cBottom, Shader.TileMode.CLAMP));
+        } else {
+            p.setShader(null); p.setColor(0xFF1B3A66);
+        }
+        cv.drawRoundRect(rf, h * 0.5f, h * 0.5f, p);
+        p.setShader(null);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2);
+        p.setColor(enabled ? 0x884DD0E1 : 0x443D5A99);
+        cv.drawRoundRect(rf, h * 0.5f, h * 0.5f, p);
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0xFF1B3A66);
-        cv.drawRoundRect(r, 12, 12, p);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(2);
-        p.setColor(0xFF4DD0E1);
-        cv.drawRoundRect(r, 12, 12, p);
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(0xFFFFFFFF);
-        cv.drawText(label, r.centerX(), r.centerY() - (p.descent() + p.ascent()) / 2, p);
+        if (enabled) {
+            p.setColor(0x33FFFFFF);
+            rf.set(x + 6, y + 3, x + w - 6, y + h * 0.42f);
+            cv.drawRoundRect(rf, h * 0.2f, h * 0.2f, p);
+        }
+        p.setColor(enabled ? 0xFFFFFFFF : 0xFF8FA3C8);
+        p.setTextSize(h * 0.36f); p.setTextAlign(Paint.Align.CENTER); p.setFakeBoldText(true);
+        p.setShadowLayer(4, 0, 2, 0x66000000);
+        cv.drawText(label, x + w / 2f, y + h * 0.64f, p);
+        p.clearShadowLayer();
+        p.setFakeBoldText(false);
     }
 
     @Override public boolean onTouchEvent(MotionEvent e) {
@@ -349,23 +427,23 @@ public class TttView extends View {
         float by = getHeight() * 0.18f;
         float cell = boardSize / 3;
         float ctrlY = by + boardSize + getHeight() * 0.035f;
-        float btnY = ctrlY + getHeight() * 0.03f;
+        float btnY = ctrlY + getHeight() * 0.038f;
         float btnH = getHeight() * 0.06f;
         float x = e.getX(), y = e.getY();
 
+        float newY = btnY + btnH + getHeight() * 0.012f;
+        if (y >= newY && y <= newY + btnH && x >= w * 0.16f && x <= w * 0.84f) { reset(); return true; }
         if (y >= btnY && y <= btnY + btnH) {
-            if (x >= w * 0.05f && x <= w * 0.36f) {
+            if (x >= w * 0.05f && x <= w * 0.35f) {
                 vsAI = !vsAI; reset(); persist(); return true;
             }
-            if (vsAI && x >= w * 0.40f && x <= w * 0.62f) {
+            if (vsAI && x >= w * 0.37f && x <= w * 0.63f) {
                 difficulty = (difficulty + 1) % 3; persist(); invalidate(); return true;
             }
-            if (vsAI && x >= w * 0.66f && x <= w * 0.82f) {
+            if (vsAI && x >= w * 0.65f && x <= w * 0.95f) {
                 if (!gameOver && turn == X && listener != null) listener.onHintRequested();
                 return true;
             }
-            float nl = vsAI ? w * 0.86f : w * 0.40f, nr = vsAI ? w * 0.97f : w * 0.62f;
-            if (x >= nl && x <= nr) { reset(); return true; }
             return true;
         }
 
