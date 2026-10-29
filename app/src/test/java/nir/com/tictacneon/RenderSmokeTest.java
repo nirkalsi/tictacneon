@@ -93,4 +93,12 @@ public class RenderSmokeTest {
         renderLatestDialog("tictacneon-hintprompt");
     }
 
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test public void rankUpOverlay() throws Exception {
+        TttView v = new TttView(RuntimeEnvironment.getApplication());
+        java.lang.reflect.Field fp = TttView.class.getDeclaredField("levelUpPending"); fp.setAccessible(true); fp.setInt(v, 5);
+        java.lang.reflect.Field fs = TttView.class.getDeclaredField("levelUpShowing"); fs.setAccessible(true); fs.setBoolean(v, true);
+        java.lang.reflect.Field fa = TttView.class.getDeclaredField("levelUpAt"); fa.setAccessible(true); fa.setLong(v, System.currentTimeMillis() - 1000);
+        renderView(v, 1080, 2243, "/tmp/renders/tictacneon-rankup.png");
+    }
 }

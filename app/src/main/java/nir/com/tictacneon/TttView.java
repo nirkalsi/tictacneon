@@ -37,6 +37,10 @@ public class TttView extends View {
     private long xp = 0;
     private int level = 1;
     private long levelFlashUntil = 0;
+    private int levelUpPending = 0;
+    private boolean levelUpShowing = false;
+    private long levelUpAt = 0;
+    private long gameOverAt = 0;
     private long aiMoveAt = 0;
     private long winAnimStart = 0;
     private int hintCell = -1;
@@ -73,6 +77,7 @@ public class TttView extends View {
             xp -= xpNeeded();
             level++;
             levelFlashUntil = System.currentTimeMillis() + 2200;
+            levelUpPending = level;
             if (listener != null) listener.onLevelUp(level, rankName(level));
         }
     }
@@ -159,7 +164,7 @@ public class TttView extends View {
         hintCell = -1;
         int[] w = checkWin(board);
         if (w != null) {
-            gameOver = true; winner = turn; winLine = w; winAnimStart = System.currentTimeMillis();
+            gameOver = true; winner = turn; winLine = w; winAnimStart = System.currentTimeMillis(); gameOverAt = winAnimStart;
             startSparks();
             GameSounds.play(getContext(), GameSounds.WIN);
             if (turn == X) scoreX++; else scoreO++;
@@ -172,7 +177,7 @@ public class TttView extends View {
             persist();
             if (listener != null) listener.onGameComplete((int) gamesDone, turn == X ? 1 : 2, difficulty);
         } else if (full(board)) {
-            gameOver = true; winner = EMPTY; draws++; gamesDone++;
+            gameOver = true; winner = EMPTY; draws++; gamesDone++; gameOverAt = System.currentTimeMillis();
             grantXp(vsAI ? 15 : 10);
             persist();
             if (listener != null) listener.onGameComplete((int) gamesDone, 3, difficulty);
@@ -396,7 +401,48 @@ public class TttView extends View {
         float pulse = gameOver ? (float) (0.5 + 0.5 * Math.sin(now / 450.0)) : 0f;
         if (pulse > 0) postInvalidateDelayed(60);
         drawNeonPill(cv, w * 0.16f, newY, w * 0.68f, btnH, "NEW GAME  \u21BB", 0xFF66BB6A, 0xFF2E7D32, true, pulse > 0.6f);
+
+        // ---- rank-up celebration overlay ----
+        if (levelUpPending > 0 && !levelUpShowing && gameOver && now - gameOverAt > 1600) {
+            levelUpShowing = true; levelUpAt = now;
+            GameSounds.play(getContext(), GameSounds.LEVEL_UP);
+        }
+        if (levelUpShowing) {
+            float h = getHeight();
+            float t = Math.min(1f, (now - levelUpAt) / 420f);
+            cv.drawColor(0xB3000000);
+            float sc = easeOutBack(t);
+            cv.save();
+            cv.scale(sc, sc, w / 2f, h * 0.42f);
+            float badgeR = w * 0.15f;
+            p.setStyle(Paint.Style.FILL); p.setColor(0xFF26C6DA);
+            cv.drawCircle(w / 2f, h * 0.36f, badgeR, p);
+            p.setColor(0xFF08303A); p.setTextSize(badgeR * 0.9f); p.setTextAlign(Paint.Align.CENTER); p.setFakeBoldText(true);
+            cv.drawText("" + levelUpPending, w / 2f, h * 0.36f + badgeR * 0.32f, p);
+            p.setFakeBoldText(false);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(w * 0.012f); p.setColor(0x554DD0E1);
+            for (int i = 0; i < 12; i++) {
+                double a = Math.PI / 6 * i + now / 900.0;
+                cv.drawLine(w / 2f + (float) Math.cos(a) * badgeR * 1.25f, h * 0.36f + (float) Math.sin(a) * badgeR * 1.25f,
+                        w / 2f + (float) Math.cos(a) * badgeR * 1.6f, h * 0.36f + (float) Math.sin(a) * badgeR * 1.6f, p);
+            }
+            p.setStyle(Paint.Style.FILL);
+            p.setTextSize(h * 0.045f); p.setTextAlign(Paint.Align.CENTER); p.setFakeBoldText(true);
+            p.setShadowLayer(h * 0.01f, 0, 0, 0xFF4DD0E1);
+            p.setColor(0xFFB2EBF2);
+            cv.drawText("RANK UP!", w / 2f, h * 0.53f, p);
+            p.setTextSize(h * 0.024f);
+            p.setColor(0xFFFFFFFF);
+            cv.drawText(rankName(levelUpPending), w / 2f, h * 0.575f, p);
+            p.clearShadowLayer(); p.setFakeBoldText(false);
+            cv.restore();
+            if (t >= 1f)
+                drawNeonPill(cv, w * 0.3f, h * 0.62f, w * 0.4f, h * 0.052f, "COLLECT", 0xFF66BB6A, 0xFF2E7D32, true, true);
+            postInvalidateDelayed(30);
+        }
     }
+
+    private float easeOutBack(float t) { float c = 1.70158f; t -= 1f; return 1f + (c + 1f) * t * t * t + c * t * t; }
 
     private void drawNeonPill(Canvas cv, float x, float y, float w, float h, String label,
                               int cTop, int cBottom, boolean enabled, boolean glow) {
