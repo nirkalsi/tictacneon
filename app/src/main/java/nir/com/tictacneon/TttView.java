@@ -154,14 +154,14 @@ public class TttView extends View {
         if (gameOver || board[cell] != EMPTY) return;
         board[cell] = turn;
         cellT[cell] = System.currentTimeMillis();
-        GameSounds.play(GameSounds.CLICK);
+        GameSounds.play(getContext(), GameSounds.CLICK);
         performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY);
         hintCell = -1;
         int[] w = checkWin(board);
         if (w != null) {
             gameOver = true; winner = turn; winLine = w; winAnimStart = System.currentTimeMillis();
             startSparks();
-            GameSounds.play(GameSounds.WIN);
+            GameSounds.play(getContext(), GameSounds.WIN);
             if (turn == X) scoreX++; else scoreO++;
             gamesDone++;
             long gain;
@@ -236,6 +236,15 @@ public class TttView extends View {
         p.setShadowLayer(16, 0, 0, 0xFF4DD0E1);
         cv.drawText("TIC TAC NEON", w / 2, getHeight() * 0.08f, p);
         p.clearShadowLayer();
+        // sound toggle
+        float spX = w * 0.93f, spY = getHeight() * 0.045f, spR = w * 0.045f;
+        p.setColor(0x66000000);
+        cv.drawCircle(spX, spY, spR, p);
+        p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2); p.setColor(0x554DD0E1);
+        cv.drawCircle(spX, spY, spR, p);
+        p.setStyle(Paint.Style.FILL);
+        p.setTextSize(spR * 0.9f); p.setTextAlign(Paint.Align.CENTER);
+        cv.drawText(GameSounds.isEnabled(getContext()) ? "\uD83D\uDD0A" : "\uD83D\uDD07", spX, spY + spR * 0.32f, p);
         p.setFakeBoldText(false);
 
         // scoreboard
