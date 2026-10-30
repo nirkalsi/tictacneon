@@ -162,7 +162,8 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
             cell.setGravity(Gravity.CENTER);
             boolean isToday = d == Math.min(streak, 7);
             boolean claimed = d < streak;
-            cell.setBackground(pill(isToday ? 0xFFFFD54F : (claimed ? 0xFFC8E6C9 : 0xFFECEFF1), 10));
+            boolean isDay7 = d == 7;
+            cell.setBackground(pill(isToday || isDay7 ? 0xFFFFD54F : (claimed ? 0xFFC8E6C9 : 0xFFECEFF1), 10));
             cell.setPadding(dp(2), dp(6), dp(2), dp(6));
             TextView dl = new TextView(this);
             dl.setText("Day " + d);
@@ -172,7 +173,7 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
             cell.addView(dl);
             TextView dv = new TextView(this);
             dv.setText(claimed ? "\u2714" : "+" + Math.min(1 + d, 5));
-            dv.setTextSize(11f);
+            dv.setTextSize(isDay7 ? 13f : 11f);
             dv.setTypeface(Typeface.DEFAULT_BOLD);
             dv.setTextColor(isToday ? 0xFF6D4C00 : 0xFF37474F);
             dv.setGravity(Gravity.CENTER);
@@ -208,11 +209,13 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         clp.setMargins(dp(8), dp(10), dp(8), dp(6));
         box.addView(claim, clp);
         claim.setOnClickListener(v -> {
+            gift.animate().rotationBy(360f).setDuration(420).withEndAction(() -> {
             dlg.dismiss();
             sp.edit().putString("daily_last", today()).putInt("daily_streak", st).apply();
             missions.onDailyClaimed(st);
             addTokens(t);
             Toast.makeText(this, "+" + t + " hint tokens!", Toast.LENGTH_SHORT).show();
+            }).start();
         });
         dlg.show();
         animateDialogIn(box);
