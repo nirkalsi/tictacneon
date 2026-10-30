@@ -345,11 +345,12 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
 
     @Override public void onProductsReady() { }
 
-    @Override protected void onPause() { GameSounds.onAppPause(); super.onPause(); saveState(); }
+    @Override protected void onPause() { GameSounds.stopMusic(); GameSounds.onAppPause(); super.onPause(); saveState(); }
 
     @Override protected void onResume() {
         super.onResume();
         GameSounds.onAppResume();
+        GameSounds.startMusic(this);
     }
 
     @Override protected void onDestroy() {
