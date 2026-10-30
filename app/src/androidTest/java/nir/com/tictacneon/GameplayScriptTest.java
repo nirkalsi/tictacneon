@@ -47,6 +47,18 @@ public class GameplayScriptTest {
         tap((bx + 0.5f * cell) / w, (by + 0.5f * cell) / h); Thread.sleep(2000); // top-left
         tap((bx + 2.5f * cell) / w, (by + 2.5f * cell) / h); Thread.sleep(2000); // bottom-right
         tap((bx + 2.5f * cell) / w, (by + 0.5f * cell) / h); Thread.sleep(2500); // top-right
+        // extra cells so at least one full game completes even if the AI blocks some taps
+        tap((bx + 0.5f * cell) / w, (by + 1.5f * cell) / h); Thread.sleep(2000); // middle-left
+        tap((bx + 2.5f * cell) / w, (by + 1.5f * cell) / h); Thread.sleep(2000); // middle-right
+        tap((bx + 0.5f * cell) / w, (by + 2.5f * cell) / h); Thread.sleep(2000); // bottom-left
+        tap((bx + 1.5f * cell) / w, (by + 2.5f * cell) / h); Thread.sleep(2000); // bottom-middle
         tap(0.5f, (h * 0.325f + w * 0.86f + h * 0.03f) / h); Thread.sleep(1500); // NEW GAME area
+        d.pressHome(); Thread.sleep(2000);
+        android.content.SharedPreferences sp = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .getTargetContext().getSharedPreferences("tictacneon", 0);
+        String state = sp.getString("state", "");
+        if (state.isEmpty()) throw new AssertionError("no saved state after scripted game");
+        long gamesDone = Long.parseLong(state.split(";")[3]);
+        if (gamesDone < 1) throw new AssertionError("game did not complete, state=" + state);
     }
 }
