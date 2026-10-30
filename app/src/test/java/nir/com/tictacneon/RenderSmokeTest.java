@@ -112,4 +112,24 @@ public class RenderSmokeTest {
         java.lang.reflect.Field fa = TttView.class.getDeclaredField("levelUpAt"); fa.setAccessible(true); fa.setLong(v, System.currentTimeMillis() - 1000);
         renderView(v, 1080, 2243, "/tmp/renders/tictacneon-rankup.png");
     }
+
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test public void winState() throws Exception {
+        TttView v = new TttView(RuntimeEnvironment.getApplication());
+        java.lang.reflect.Field fb = TttView.class.getDeclaredField("board"); fb.setAccessible(true);
+        int[] b = (int[]) fb.get(v); b[0] = 1; b[1] = 1; b[2] = 1; b[4] = 2; b[5] = 2;
+        java.lang.reflect.Field fg = TttView.class.getDeclaredField("gameOver"); fg.setAccessible(true); fg.setBoolean(v, true);
+        java.lang.reflect.Field fw = TttView.class.getDeclaredField("winner"); fw.setAccessible(true); fw.setInt(v, 1);
+        java.lang.reflect.Field fl = TttView.class.getDeclaredField("winLine"); fl.setAccessible(true); fl.set(v, new int[]{0, 1, 2});
+        long t0 = System.currentTimeMillis() - 2000;
+        java.lang.reflect.Field fa = TttView.class.getDeclaredField("winAnimStart"); fa.setAccessible(true); fa.setLong(v, t0);
+        java.lang.reflect.Field fo = TttView.class.getDeclaredField("gameOverAt"); fo.setAccessible(true); fo.setLong(v, t0);
+        renderView(v, 1080, 2243, "/tmp/renders/tictacneon-win.png");
+    }
+
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test public void renderGameViewSmall() throws Exception {
+        renderView(new TttView(RuntimeEnvironment.getApplication()), 960, 1600, "/tmp/renders/tictacneon-game-960x1600.png");
+    }
+
 }
