@@ -324,9 +324,7 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
 
     @Override public void onHintRequested() { useOrGetHint(); }
 
-    @Override public void onLevelUp(int level, String rank) {
-        Toast.makeText(this, "Rank up: " + rank + " (level " + level + ")", Toast.LENGTH_SHORT).show();
-    }
+    @Override public void onLevelUp(int level, String rank) { /* in-game celebration overlay handles this */ }
 
     @Override public void saveState() {
         sp.edit().putString(KEY, game.serialize()).apply();
