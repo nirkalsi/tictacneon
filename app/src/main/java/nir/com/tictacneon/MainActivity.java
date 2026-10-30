@@ -192,16 +192,29 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         box.addView(sub);
 
         final int t = tokens, st = streak;
-        new AlertDialog.Builder(this)
+        AlertDialog dlg = new AlertDialog.Builder(this)
             .setView(box)
-            .setPositiveButton("Claim +" + t, (d, w) -> {
-                sp.edit().putString("daily_last", today()).putInt("daily_streak", st).apply();
-                missions.onDailyClaimed(st);
-                addTokens(t);
-                Toast.makeText(this, "+" + t + " hint tokens!", Toast.LENGTH_SHORT).show();
-            })
             .setCancelable(false)
-            .show();
+            .create();
+        TextView claim = new TextView(this);
+        claim.setText("CLAIM +" + t + " \u2728");
+        claim.setTextSize(16f);
+        claim.setTypeface(Typeface.DEFAULT_BOLD);
+        claim.setTextColor(0xFFFFFFFF);
+        claim.setGravity(Gravity.CENTER);
+        claim.setBackground(pill(0xFF2E7D32, 22));
+        claim.setPadding(dp(10), dp(12), dp(10), dp(12));
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
+        clp.setMargins(dp(8), dp(10), dp(8), dp(6));
+        box.addView(claim, clp);
+        claim.setOnClickListener(v -> {
+            dlg.dismiss();
+            sp.edit().putString("daily_last", today()).putInt("daily_streak", st).apply();
+            missions.onDailyClaimed(st);
+            addTokens(t);
+            Toast.makeText(this, "+" + t + " hint tokens!", Toast.LENGTH_SHORT).show();
+        });
+        dlg.show();
         animateDialogIn(box);
     }
 
