@@ -31,7 +31,7 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
     private MissionsManager missions;
     private SharedPreferences sp;
     private LinearLayout bannerBox;
-    private Button removeAdsBtn, hintsBtn;
+    private Button hintsBtn;
     private final Handler handler = new Handler();
 
     @Override protected void onCreate(Bundle b) {
@@ -98,7 +98,6 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         row.setPadding(dp(6), dp(6), dp(6), dp(2));
         addRowButton(row, "\uD83C\uDFAF MISSIONS", v -> showMissions(), 0xFF1565C0);
         hintsBtn = addRowButton(row, "\u2728 HINTS", v -> useOrGetHint(), 0xFF6A1B9A);
-        removeAdsBtn = addRowButton(row, "NO ADS", v -> buyRemoveAds(), 0xFF546E7A);
         return row;
     }
 
@@ -309,25 +308,14 @@ public class MainActivity extends Activity implements TttView.Listener, BillingM
         }
     }
 
-    // ---------- remove ads ----------
-    private void buyRemoveAds() {
-        if (billing.getDetails(BillingManager.REMOVE_ADS) != null) {
-            billing.buy(this, BillingManager.REMOVE_ADS);
-        } else {
-            Toast.makeText(this, "Not available yet - try again soon", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     private void applyAdsRemoved() {
         bannerBox.removeAllViews();
-        if (removeAdsBtn != null) removeAdsBtn.setVisibility(View.GONE);
     }
 
     // ---------- TttView.Listener ----------
     @Override public void onGameComplete(int gamesDone, int outcome, int difficulty) {
         missions.onGame(outcome, difficulty);
         if (outcome == 1 && difficulty == 2) maybePromptReview();
-        ads.maybeShowInterstitial(gamesDone);
         if (sp.getInt("games_done_flag", 0) == 0) {
             sp.edit().putInt("games_done_flag", 1).apply();
             if (!sp.getBoolean("ads_removed", false)) ads.attachBanner(bannerBox);

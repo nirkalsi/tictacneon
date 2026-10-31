@@ -4,8 +4,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.widget.LinearLayout;
 import com.google.android.gms.ads.*;
-import com.google.android.gms.ads.interstitial.InterstitialAd;
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
 import com.google.android.gms.ads.rewarded.RewardedAd;
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
 import com.google.android.ump.*;
@@ -14,12 +12,9 @@ import com.google.android.ump.*;
  *  (min 90s apart, never on first order, never back-to-back), rewarded only user-initiated. */
 public class AdsManager {
     private final Activity act;
-    private InterstitialAd inter;
     private RewardedAd rewarded;
     private boolean adsRemoved = false;
     public void setAdsRemoved(boolean removed) { adsRemoved = removed; }
-    private long lastInterAt = 0;
-    private int interRetry = 0;
     private int rewardedRetry = 0;
     private boolean initialized = false;
 
@@ -42,7 +37,7 @@ public class AdsManager {
         if (initialized) { ready.run(); return; }
         initialized = true;
         MobileAds.initialize(act, s -> {});
-        loadInter(); loadRewarded();
+        loadRewarded();
         ready.run();
     }
 
@@ -84,34 +79,12 @@ public class AdsManager {
         }, backoffMs(attempt));
     }
 
-    private void loadInter() {
-        InterstitialAd.load(act, BuildConfig.INTER_ID, new AdRequest.Builder().build(),
-            new InterstitialAdLoadCallback() {
-                @Override public void onAdLoaded(InterstitialAd ad) { inter = ad; }
-                @Override public void onAdFailedToLoad(LoadAdError e) { inter = null; scheduleRetry(() -> loadInter(), interRetry++); }
-            });
-    }
-
     private void loadRewarded() {
         RewardedAd.load(act, BuildConfig.REWARD_ID, new AdRequest.Builder().build(),
             new RewardedAdLoadCallback() {
                 @Override public void onAdLoaded(RewardedAd ad) { rewarded = ad; }
                 @Override public void onAdFailedToLoad(LoadAdError e) { rewarded = null; scheduleRetry(() -> loadRewarded(), rewardedRetry++); }
             });
-    }
-
-    /** Show interstitial if pacing allows. Call with the completed-order count. */
-    public void maybeShowInterstitial(int ordersDone) {
-        if (adsRemoved || inter == null || ordersDone < 3 || ordersDone % 3 != 0) return;
-        long now = System.currentTimeMillis();
-        if (now - lastInterAt < 90000) return;
-        lastInterAt = now;
-        InterstitialAd ad = inter; inter = null;
-        ad.setFullScreenContentCallback(new FullScreenContentCallback() {
-            @Override public void onAdDismissedFullScreenContent() { loadInter(); }
-            @Override public void onAdFailedToShowFullScreenContent(AdError e) { loadInter(); }
-        });
-        ad.show(act);
     }
 
     public boolean hasRewarded() { return rewarded != null; }
